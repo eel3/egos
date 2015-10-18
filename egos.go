@@ -25,13 +25,12 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"go/format"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
-	"unsafe"
 )
 
 const (
@@ -59,11 +58,11 @@ import (
 	"fmt"
 	"os"
 )
+
 %s
 
 func fn(line string) {
-%s
-%s
+%s%s
 }
 
 func doIt(in *os.File) {
@@ -103,7 +102,7 @@ func generateImport(i_opt string, pred func(string) bool) (string, int) {
 	for _, v := range tmp {
 		v = strings.Trim(v, " \t")
 		if pred(v) {
-			pkgs = append(pkgs, "\t"+v)
+			pkgs = append(pkgs, v)
 		}
 	}
 	if len(pkgs) == 0 {
@@ -112,13 +111,9 @@ func generateImport(i_opt string, pred func(string) bool) (string, int) {
 	return "import (\n" + strings.Join(pkgs, "\n") + "\n)", len(pkgs) + 2
 }
 
-// Add indent.
-func addIndent(src string) string {
-	return regexp.MustCompile("^").ReplaceAllString(src, "\t")
-}
-
 // Generate golang script.
-func generateScript(src, i_opt string, n_opt, p_opt bool) string {
+func generateScript(orig_src, i_opt string, n_opt, p_opt bool) string {
+	src := strings.Trim(orig_src, "\t\n\v\f\r ")
 	if n_opt || p_opt {
 		is, _ := generateImport(i_opt, func(s string) bool {
 			switch s {
@@ -132,17 +127,22 @@ func generateScript(src, i_opt string, n_opt, p_opt bool) string {
 		if n_opt {
 			appendage = ""
 		} else {
-			appendage = "\tfmt.Println(line)"
+			appendage = "\nfmt.Println(line)"
 		}
-		return fmt.Sprintf(template_n, is, addIndent(src), appendage)
+		return fmt.Sprintf(template_n, is, src, appendage)
 	} else {
 		is, _ := generateImport(i_opt, func(s string) bool { return s != "" })
-		return fmt.Sprintf(template, is, addIndent(src))
+		return fmt.Sprintf(template, is, src)
 	}
 }
 
+// Format golang script.
+func formatScript(src string) ([]byte, error) {
+	return format.Source([]byte(src))
+}
+
 // Run golang script.
-func runScript(script string, args []string) int {
+func runScript(script []byte, args []string) int {
 	dir, err := ioutil.TempDir("", "egos-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -154,7 +154,7 @@ func runScript(script string, args []string) int {
 	scriptFile := filepath.Join(dir, "script.go")
 	execFile := filepath.Join(dir, "script.exe")
 
-	err = ioutil.WriteFile(scriptFile, *(*[]byte)(unsafe.Pointer(&script)), os.ModePerm)
+	err = ioutil.WriteFile(scriptFile, script, os.ModePerm)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exit_failure
@@ -204,10 +204,15 @@ func main() {
 		os.Exit(exit_failure)
 	}
 
-	script := generateScript(flag.Arg(0), *i_opt, *n_opt, *p_opt)
+	script, err := formatScript(generateScript(flag.Arg(0), *i_opt, *n_opt, *p_opt))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "syntax error")
+		os.Exit(exit_failure)
+	}
+
 	retcode := exit_success
 	if *d_opt {
-		fmt.Print(script)
+		fmt.Printf("%s", script)
 	} else {
 		retcode = runScript(script, flag.Args()[1:])
 	}

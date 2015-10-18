@@ -13,12 +13,12 @@ Target environments
 
 Windows, Linux, Mac OS X.
 
-egos is written in Go 1.4, and so probably works fine on other OS.
+egos is written in Go 1.5.1, and so probably works fine on other OS.
 
 Set up
 ------
 
-1. Install [Go](https://golang.org/ "Official website") 1.4 or later.
+1. Install [Go](https://golang.org/ "Official website") 1.5.1 or later.
 2. Compile egos.go (`go build egos.go`).
 3. Put egos in a directory registered in PATH.
 
