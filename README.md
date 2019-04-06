@@ -11,7 +11,7 @@ zlib License.
 Target environments
 -------------------
 
-Windows, Linux, Mac OS X.
+Windows, Linux, macOS.
 
 egos is written in Go 1.5.1, and so probably works fine on other OS.
 
